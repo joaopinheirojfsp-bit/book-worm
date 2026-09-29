@@ -1,0 +1,50 @@
+name: Gerar APK Android
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Configurar Java / Android SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Instalar Dependências e Capacitor
+        run: |
+          npm install
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          if [ -d "dist" ] || [ -d "build" ]; then
+            echo "Pasta de build já existe"
+          else
+            npm run build || true
+          fi
+          npx cap init "BookWorm" "com.bookworm.app" --web-dir "${WEB_DIR:-dist}" || true
+          npx cap add android || true
+          npx cap copy android || true
+
+      - name: Compilar APK Android
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Guardar Ficheiro APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BookWorm-App-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
