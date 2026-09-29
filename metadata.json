@@ -1,0 +1,8 @@
+{
+  "name": "BookWorm",
+  "description": "Catálogo inteligente de livros com leitor de código de barras, busca em bibliotecas públicas, avaliação pessoal e exportação em PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
