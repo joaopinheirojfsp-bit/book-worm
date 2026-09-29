@@ -1,4 +1,4 @@
-name: Gerar APK Android
+name: Gerar APK Android Directo
 
 on:
   push:
@@ -13,33 +13,23 @@ jobs:
       - name: Baixar código
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
       - name: Configurar Java / Android SDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Instalar Dependencias
+      - name: Instalar Capacitor Globalmente
         run: |
-          npm install --force
-          npm install @capacitor/core @capacitor/cli @capacitor/android --save-dev
+          npm install -g @capacitor/cli
 
-      - name: Compilar Projeto Web
+      - name: Criar Estrutura Android
         run: |
-          npm run build || true
-
-      - name: Configurar Capacitor e Gerar Pasta Android
-        run: |
-          npx cap init "BookWorm" "com.bookworm.app" --web-dir "dist"
+          mkdir -p www
+          cp -r * www/ 2>/dev/null || true
+          npx cap init "BookWorm" "com.bookworm.app" --web-dir "www"
+          npm install @capacitor/core @capacitor/android
           npx cap add android
-
-      - name: Sincronizar Ficheiros para Android
-        run: |
           npx cap sync android
 
       - name: Compilar APK Android
