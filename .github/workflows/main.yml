@@ -24,18 +24,23 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Instalar Dependências e Capacitor
+      - name: Instalar Dependencias
         run: |
-          npm install
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          if [ -d "dist" ] || [ -d "build" ]; then
-            echo "Pasta de build já existe"
-          else
-            npm run build || true
-          fi
-          npx cap init "BookWorm" "com.bookworm.app" --web-dir "${WEB_DIR:-dist}" || true
-          npx cap add android || true
-          npx cap copy android || true
+          npm install --force
+          npm install @capacitor/core @capacitor/cli @capacitor/android --save-dev
+
+      - name: Compilar Projeto Web
+        run: |
+          npm run build || true
+
+      - name: Configurar Capacitor e Gerar Pasta Android
+        run: |
+          npx cap init "BookWorm" "com.bookworm.app" --web-dir "dist"
+          npx cap add android
+
+      - name: Sincronizar Ficheiros para Android
+        run: |
+          npx cap sync android
 
       - name: Compilar APK Android
         run: |
