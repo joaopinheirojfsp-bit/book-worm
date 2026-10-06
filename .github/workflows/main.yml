@@ -1,4 +1,4 @@
-name: Gerar APK Android Directo
+name: Gerar APK Android WebView
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar código
+      - name: Baixar código da Web App
         uses: actions/checkout@v4
 
       - name: Configurar Java / Android SDK
@@ -19,27 +19,94 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Instalar Capacitor Globalmente
+      - name: Criar Projeto Android Nativo
         run: |
-          npm install -g @capacitor/cli
+          mkdir -p android_app/app/src/main/assets/www
+          cp -r * android_app/app/src/main/assets/www/ 2>/dev/null || true
+          
+          cat << 'EOF' > android_app/settings.gradle
+          rootProject.name = "BookWorm"
+          include ':app'
+          EOF
 
-      - name: Criar Estrutura Android
-        run: |
-          mkdir -p www
-          cp -r * www/ 2>/dev/null || true
-          npx cap init "BookWorm" "com.bookworm.app" --web-dir "www"
-          npm install @capacitor/core @capacitor/android
-          npx cap add android
-          npx cap sync android
+          cat << 'EOF' > android_app/build.gradle
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.1.1' }
+          }
+          allprojects {
+              repositories { google(); mavenCentral() }
+          }
+          EOF
+
+          mkdir -p android_app/app
+          cat << 'EOF' > android_app/app/build.gradle
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'com.bookworm.app'
+              compileSdk 33
+              defaultConfig {
+                  applicationId "com.bookworm.app"
+                  minSdk 21
+                  targetSdk 33
+                  versionCode 1
+                  versionName "1.0"
+              }
+          }
+          EOF
+
+          mkdir -p android_app/app/src/main/java/com/bookworm/app
+          cat << 'EOF' > android_app/app/src/main/java/com/bookworm/app/MainActivity.java
+          package com.bookworm.app;
+
+          import android.os.Bundle;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import androidx.appcompat.app.AppCompatActivity;
+
+          public class MainActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  WebView webView = new WebView(this);
+                  setContentView(webView);
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.loadUrl("file:///android_asset/www/index.html");
+              }
+          }
+          EOF
+
+          mkdir -p android_app/app/src/main
+          cat << 'EOF' > android_app/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:label="BookWorm"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
 
       - name: Compilar APK Android
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          cd android_app
+          gradle assembleDebug
 
       - name: Guardar Ficheiro APK
         uses: actions/upload-artifact@v4
         with:
           name: BookWorm-App-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android_app/app/build/outputs/apk/debug/app-debug.apk
