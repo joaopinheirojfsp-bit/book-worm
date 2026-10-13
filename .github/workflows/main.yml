@@ -19,13 +19,18 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Criar Projeto Android Nativo
+- name: Criar Projeto Android Nativo
         run: |
           mkdir -p android_app/app/src/main/assets/www
           
-          # Copiar tudo da raiz para a pasta assets (exceto pastas do sistema e de configuração)
-          cp -r * android_app/app/src/main/assets/www/ 2>/dev/null || true
-          rm -rf android_app/app/src/main/assets/www/.git android_app/app/src/main/assets/www/.github android_app/app/src/main/assets/www/android_app
+          # Copiar o conteúdo da pasta public (onde estão o index.html e os assets da app) diretamente para a pasta www
+          if [ -d "public" ]; then
+            cp -r public/* android_app/app/src/main/assets/www/
+          elif [ -d "public/assets/aistudio" ]; then
+            cp -r public/assets/aistudio/* android_app/app/src/main/assets/www/
+          else
+            find . -name "index.html" -not -path "*/android_app/*" -exec cp {} android_app/app/src/main/assets/www/ \;
+          fi
           
           cat << 'EOF' > android_app/settings.gradle
           rootProject.name = "BookWorm"
@@ -112,5 +117,5 @@ jobs:
       - name: Guardar Ficheiro APK
         uses: actions/upload-artifact@v4
         with:
-          name: BookWorm-App-APK-v3
+          name: BookWorm-App-APK-v4
           path: android_app/app/build/outputs/apk/debug/app-debug.apk
