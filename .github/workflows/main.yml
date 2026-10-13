@@ -19,7 +19,7 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-- name: Criar Projeto Android Nativo
+      - name: Criar Projeto Android Nativo
         run: |
           mkdir -p android_app/app/src/main/assets/www
           
