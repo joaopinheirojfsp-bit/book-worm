@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,14 +36,19 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -95,6 +101,9 @@ fun BookDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showCoverChangeDialog by remember { mutableStateOf(false) }
     var showAddTagDialog by remember { mutableStateOf(false) }
+    var showMoveToListDialog by remember { mutableStateOf(false) }
+    var showIsbnDialog by remember { mutableStateOf(false) }
+    val allCollections by viewModel.collections.collectAsState()
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -252,6 +261,211 @@ fun BookDetailScreen(
         )
     }
 
+    // Dialog: Ver Código ISBN
+    if (showIsbnDialog) {
+        var manualIsbn by remember { mutableStateOf("") }
+        var isEditingIsbn by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { showIsbnDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.QrCode, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Código ISBN")
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(book.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(book.author, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    if (book.isbn.isNotBlank() && !isEditingIsbn) {
+                        Surface(
+                            color = Color.White,
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                com.example.ui.home.BarcodeVisualRepresentation(isbn = book.isbn)
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "ISBN: ${book.isbn}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = manualIsbn,
+                            onValueChange = { manualIsbn = it },
+                            label = { Text("Código ISBN") },
+                            placeholder = { Text("Ex: 9788535914849") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Button(
+                            onClick = {
+                                if (manualIsbn.isNotBlank()) {
+                                    viewModel.updateBookIsbn(book, manualIsbn)
+                                    isEditingIsbn = false
+                                    showIsbnDialog = false
+                                }
+                            },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Salvar ISBN")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (book.isbn.isNotBlank() && !isEditingIsbn) {
+                    Button(onClick = {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("ISBN", book.isbn)
+                        clipboard.setPrimaryClip(clip)
+                        android.widget.Toast.makeText(context, "ISBN copiado!", android.widget.Toast.LENGTH_SHORT).show()
+                    }) {
+                        Text("Copiar")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showIsbnDialog = false }) {
+                    Text("Fechar")
+                }
+            }
+        )
+    }
+
+    // Dialog: Mover para Outra Lista
+    if (showMoveToListDialog) {
+        AlertDialog(
+            onDismissRequest = { showMoveToListDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Mover Livro")
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Selecione a lista de destino para \"${book.title}\":",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    if (book.isTemporary) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFFEF3C7),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "💡 Ao mover para 'A Minha Biblioteca', 'Lidos', 'A Ler' ou outra lista permanente, este livro passará a integrar a sua biblioteca permanente e o status de leitura poderá ser alterado.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF92400E),
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        item {
+                            com.example.ui.home.DestinationItemCard(
+                                title = "A Minha Biblioteca",
+                                subtitle = "Lista Permanente • Todas as abas",
+                                tag = "Permanente",
+                                color = MaterialTheme.colorScheme.primary,
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.MinhaBiblioteca) {
+                                        android.widget.Toast.makeText(context, "Movido para 'A Minha Biblioteca'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        showMoveToListDialog = false
+                                    }
+                                }
+                            )
+                        }
+                        item {
+                            com.example.ui.home.DestinationItemCard(
+                                title = "Lidos",
+                                subtitle = "Lista Permanente • Livro concluído",
+                                tag = "Permanente",
+                                color = Color(0xFF059669),
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.Lidos) {
+                                        android.widget.Toast.makeText(context, "Movido para 'Lidos'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        showMoveToListDialog = false
+                                    }
+                                }
+                            )
+                        }
+                        item {
+                            com.example.ui.home.DestinationItemCard(
+                                title = "A Ler",
+                                subtitle = "Lista Permanente • Leitura ativa",
+                                tag = "Permanente",
+                                color = Color(0xFF2563EB),
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.ALer) {
+                                        android.widget.Toast.makeText(context, "Movido para 'A Ler'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        showMoveToListDialog = false
+                                    }
+                                }
+                            )
+                        }
+                        item {
+                            com.example.ui.home.DestinationItemCard(
+                                title = "Quero Ler",
+                                subtitle = "Lista Temporária • Desejos futuros (status fixo)",
+                                tag = "Temporária",
+                                color = Color(0xFFD97706),
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.QueroLer) {
+                                        android.widget.Toast.makeText(context, "Movido para 'Quero Ler'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        showMoveToListDialog = false
+                                    }
+                                }
+                            )
+                        }
+                        items(allCollections.size) { idx ->
+                            val col = allCollections[idx]
+                            com.example.ui.home.DestinationItemCard(
+                                title = col.name,
+                                subtitle = if (col.isTemporary) "Lista Temporária personalizada" else "Lista Permanente personalizada",
+                                tag = if (col.isTemporary) "Temporária" else "Permanente",
+                                color = Color(android.graphics.Color.parseColor(col.colorHex.ifBlank { "#1E3A5F" })),
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.Custom(col)) {
+                                        android.widget.Toast.makeText(context, "Movido para '${col.name}'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        showMoveToListDialog = false
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showMoveToListDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -265,6 +479,18 @@ fun BookDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showIsbnDialog = true },
+                        modifier = Modifier.testTag("detail_isbn_button")
+                    ) {
+                        Icon(Icons.Default.QrCode, contentDescription = "Ver ISBN")
+                    }
+                    IconButton(
+                        onClick = { showMoveToListDialog = true },
+                        modifier = Modifier.testTag("detail_move_button")
+                    ) {
+                        Icon(Icons.Default.SwapHoriz, contentDescription = "Mover para outra Lista")
+                    }
                     IconButton(
                         onClick = { viewModel.toggleFavorite(book) },
                         modifier = Modifier.testTag("favorite_button")
@@ -521,23 +747,89 @@ fun BookDetailScreen(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "Status de Leitura:",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ReadingStatus.values().forEach { status ->
-                            FilterChip(
-                                selected = book.readingStatus == status,
-                                onClick = { viewModel.updateReadingStatus(book, status) },
-                                label = { Text(status.label, style = MaterialTheme.typography.labelSmall) }
-                            )
+                        Text(
+                            text = "Status de Leitura:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (book.isTemporary) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFFFEF3C7)
+                            ) {
+                                Text(
+                                    text = "Lista Temporária",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF92400E),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (book.isTemporary) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFFEF3C7).copy(alpha = 0.6f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD97706)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = Color(0xFF92400E),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Opção fixa como 'Não lido'",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = Color(0xFF92400E)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Na aba 'Quero Ler' e em todas as abas temporárias, a opção deve ser sempre 'Não lido'. Esta opção só é alterável quando se muda para lista permanente.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF78350F)
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = { showMoveToListDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Mover para Lista Permanente", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ReadingStatus.values().forEach { status ->
+                                FilterChip(
+                                    selected = book.readingStatus == status,
+                                    onClick = { viewModel.updateReadingStatus(book, status) },
+                                    label = { Text(status.label, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
                         }
                     }
                 }

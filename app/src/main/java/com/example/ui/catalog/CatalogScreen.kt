@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -121,6 +122,9 @@ fun CatalogScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showAddOptionsDialog by remember { mutableStateOf(false) }
+    var isbnDialogBook by remember { mutableStateOf<com.example.data.model.Book?>(null) }
+    var moveToListBook by remember { mutableStateOf<com.example.data.model.Book?>(null) }
+    var deleteBookConfirm by remember { mutableStateOf<com.example.data.model.Book?>(null) }
 
     // Export PDF Dialog
     if (showExportDialog) {
@@ -210,6 +214,224 @@ fun CatalogScreen(
             dismissButton = {
                 TextButton(onClick = { showAddOptionsDialog = false }) {
                     Text("Fechar")
+                }
+            }
+        )
+    }
+
+    // Dialog: Ver Código ISBN
+    if (isbnDialogBook != null) {
+        val book = isbnDialogBook!!
+        var manualIsbn by remember { mutableStateOf("") }
+        var isEditingIsbn by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { isbnDialogBook = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Código ISBN")
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(book.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(book.author, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    if (book.isbn.isNotBlank() && !isEditingIsbn) {
+                        Surface(
+                            color = androidx.compose.ui.graphics.Color.White,
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFCBD5E1)),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                com.example.ui.home.BarcodeVisualRepresentation(isbn = book.isbn)
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "ISBN: ${book.isbn}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = androidx.compose.ui.graphics.Color.Black
+                                )
+                            }
+                        }
+                    } else {
+                        Column {
+                            Text("Cadastrar ou editar código ISBN:")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            OutlinedTextField(
+                                value = manualIsbn,
+                                onValueChange = { manualIsbn = it },
+                                label = { Text("ISBN") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Button(
+                                onClick = {
+                                    if (manualIsbn.isNotBlank()) {
+                                        viewModel.updateBookIsbn(book, manualIsbn)
+                                        isbnDialogBook = null
+                                        android.widget.Toast.makeText(context, "ISBN cadastrado!", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Text("Salvar")
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (book.isbn.isNotBlank() && !isEditingIsbn) {
+                    Button(onClick = {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("ISBN", book.isbn)
+                        clipboard.setPrimaryClip(clip)
+                        android.widget.Toast.makeText(context, "ISBN copiado!", android.widget.Toast.LENGTH_SHORT).show()
+                    }) {
+                        Text("Copiar ISBN")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isbnDialogBook = null }) {
+                    Text("Fechar")
+                }
+            }
+        )
+    }
+
+    // Dialog: Mover para Outra Lista
+    if (moveToListBook != null) {
+        val book = moveToListBook!!
+        AlertDialog(
+            onDismissRequest = { moveToListBook = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Book, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Mover Livro")
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Selecione a lista de destino para '${book.title}':")
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        item {
+                            com.example.ui.home.DestinationItemCard(
+                                title = "A Minha Biblioteca",
+                                subtitle = "Lista Permanente • Todas as abas",
+                                tag = "Permanente",
+                                color = MaterialTheme.colorScheme.primary,
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.MinhaBiblioteca) {
+                                        android.widget.Toast.makeText(context, "Movido!", android.widget.Toast.LENGTH_SHORT).show()
+                                        moveToListBook = null
+                                    }
+                                }
+                            )
+                        }
+                        item {
+                            com.example.ui.home.DestinationItemCard(
+                                title = "A Ler",
+                                subtitle = "Lista Permanente • Leitura em andamento",
+                                tag = "Permanente",
+                                color = androidx.compose.ui.graphics.Color(0xFF2563EB),
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.ALer) {
+                                        android.widget.Toast.makeText(context, "Movido para 'A Ler'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        moveToListBook = null
+                                    }
+                                }
+                            )
+                        }
+                        item {
+                            com.example.ui.home.DestinationItemCard(
+                                title = "Lidos",
+                                subtitle = "Lista Permanente • Concluído",
+                                tag = "Permanente",
+                                color = androidx.compose.ui.graphics.Color(0xFF059669),
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.Lidos) {
+                                        android.widget.Toast.makeText(context, "Movido para 'Lidos'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        moveToListBook = null
+                                    }
+                                }
+                            )
+                        }
+                        item {
+                            com.example.ui.home.DestinationItemCard(
+                                title = "Quero Ler",
+                                subtitle = "Lista Temporária • Desejos futuros",
+                                tag = "Temporária",
+                                color = androidx.compose.ui.graphics.Color(0xFFD97706),
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.QueroLer) {
+                                        android.widget.Toast.makeText(context, "Movido para 'Quero Ler'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        moveToListBook = null
+                                    }
+                                }
+                            )
+                        }
+                        items(collections) { col ->
+                            com.example.ui.home.DestinationItemCard(
+                                title = col.name,
+                                subtitle = if (col.isTemporary) "Lista Temporária" else "Lista Permanente",
+                                tag = if (col.isTemporary) "Temporária" else "Permanente",
+                                color = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(col.colorHex.ifBlank { "#1E3A5F" })),
+                                onClick = {
+                                    viewModel.moveBookToList(book, com.example.ui.TargetListOption.Custom(col)) {
+                                        android.widget.Toast.makeText(context, "Movido para '${col.name}'!", android.widget.Toast.LENGTH_SHORT).show()
+                                        moveToListBook = null
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { moveToListBook = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Dialog: Remover Livro
+    if (deleteBookConfirm != null) {
+        val book = deleteBookConfirm!!
+        AlertDialog(
+            onDismissRequest = { deleteBookConfirm = null },
+            title = { Text("Remover Livro Permanentemente") },
+            text = { Text("Deseja excluir '${book.title}' de todas as listas e da biblioteca?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteBook(book)
+                        deleteBookConfirm = null
+                        android.widget.Toast.makeText(context, "Livro removido.", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Remover Definitivamente")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteBookConfirm = null }) {
+                    Text("Cancelar")
                 }
             }
         )
@@ -698,7 +920,11 @@ fun CatalogScreen(
                                     BookGridCard(
                                         book = book,
                                         onClick = { onNavigateToDetail(book.id) },
-                                        onToggleFavorite = { viewModel.toggleFavorite(book) }
+                                        onToggleFavorite = { viewModel.toggleFavorite(book) },
+                                        onViewIsbn = { b -> isbnDialogBook = b },
+                                        onMoveToList = { b -> moveToListBook = b },
+                                        onEditBook = { b -> onNavigateToDetail(b.id) },
+                                        onDeleteBook = { b -> deleteBookConfirm = b }
                                     )
                                 }
                             }
@@ -720,7 +946,11 @@ fun CatalogScreen(
                             book = book,
                             onClick = { onNavigateToDetail(book.id) },
                             onToggleFavorite = { viewModel.toggleFavorite(book) },
-                            onShare = { PdfExporter.shareBookText(context, book) }
+                            onShare = { PdfExporter.shareBookText(context, book) },
+                            onViewIsbn = { b -> isbnDialogBook = b },
+                            onMoveToList = { b -> moveToListBook = b },
+                            onEditBook = { b -> onNavigateToDetail(b.id) },
+                            onDeleteBook = { b -> deleteBookConfirm = b }
                         )
                     }
                 }

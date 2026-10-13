@@ -18,17 +18,28 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,7 +71,7 @@ fun getReadingStatusColors(status: ReadingStatus): Pair<Color, Color> {
 }
 
 /**
- * Horizontal List view card showing full metadata, rating, and notes.
+ * Horizontal List view card showing full metadata, rating, notes, and 3-dots action menu.
  */
 @Composable
 fun BookCardItem(
@@ -68,6 +79,10 @@ fun BookCardItem(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
     onShare: (() -> Unit)? = null,
+    onViewIsbn: ((Book) -> Unit)? = null,
+    onMoveToList: ((Book) -> Unit)? = null,
+    onEditBook: ((Book) -> Unit)? = null,
+    onDeleteBook: ((Book) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -145,18 +160,97 @@ fun BookCardItem(
                         modifier = Modifier.weight(1f)
                     )
 
-                    IconButton(
-                        onClick = onToggleFavorite,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .testTag("fav_btn_${book.id}")
-                    ) {
-                        Icon(
-                            if (book.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorito",
-                            tint = if (book.isFavorite) Color(0xFFE11D48) else MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(20.dp)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onToggleFavorite,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .testTag("fav_btn_${book.id}")
+                        ) {
+                            Icon(
+                                if (book.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Favorito",
+                                tint = if (book.isFavorite) Color(0xFFE11D48) else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // 3-dots Menu for book actions
+                        var menuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(
+                                onClick = { menuExpanded = true },
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .testTag("book_menu_btn_${book.id}")
+                            ) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = "Mais opções",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Ver Código ISBN") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.QrCode,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onViewIsbn?.invoke(book)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Mover para outra Lista") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.SwapHoriz,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onMoveToList?.invoke(book)
+                                    }
+                                )
+                                if (onEditBook != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Editar Informações") },
+                                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onEditBook.invoke(book)
+                                        }
+                                    )
+                                }
+                                if (onDeleteBook != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Remover Permanentemente", color = MaterialTheme.colorScheme.error) },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onDeleteBook.invoke(book)
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -211,7 +305,12 @@ fun BookCardItem(
                     }
 
                     // Status Pill
-                    val (statusBg, statusTextColor) = getReadingStatusColors(book.readingStatus)
+                    val (statusLabel, statusBg, statusTextColor) = if (book.isTemporary || book.readingStatus == ReadingStatus.QUERO_LER) {
+                        Triple("Não lido", Color(0xFFFEF3C7), Color(0xFF92400E))
+                    } else {
+                        val (bg, tc) = getReadingStatusColors(book.readingStatus)
+                        Triple(book.readingStatus.label, bg, tc)
+                    }
 
                     Box(
                         modifier = Modifier
@@ -219,7 +318,7 @@ fun BookCardItem(
                             .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = book.readingStatus.label,
+                            text = statusLabel,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = statusTextColor
@@ -258,17 +357,26 @@ fun BookCardItem(
 }
 
 /**
- * Grid view card emphasizing cover art in a 2-column or 3-column layout.
+ * Grid view card emphasizing cover art in a 2-column or 3-column layout with 3-dots menu.
  */
 @Composable
 fun BookGridCard(
     book: Book,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onViewIsbn: ((Book) -> Unit)? = null,
+    onMoveToList: ((Book) -> Unit)? = null,
+    onEditBook: ((Book) -> Unit)? = null,
+    onDeleteBook: ((Book) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val (statusBg, statusTextColor) = getReadingStatusColors(book.readingStatus)
+    val (statusLabel, statusBg, statusTextColor) = if (book.isTemporary || book.readingStatus == ReadingStatus.QUERO_LER) {
+        Triple("Não lido", Color(0xFFFEF3C7), Color(0xFF92400E))
+    } else {
+        val (bg, tc) = getReadingStatusColors(book.readingStatus)
+        Triple(book.readingStatus.label, bg, tc)
+    }
 
     Card(
         modifier = modifier
@@ -354,7 +462,7 @@ fun BookGridCard(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = book.readingStatus.label,
+                        text = statusLabel,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = statusTextColor
@@ -364,13 +472,96 @@ fun BookGridCard(
 
             // Info section below cover
             Column(modifier = Modifier.padding(10.dp)) {
-                Text(
-                    text = book.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = book.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    var gridMenuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(
+                            onClick = { gridMenuExpanded = true },
+                            modifier = Modifier
+                                .size(26.dp)
+                                .testTag("grid_book_menu_btn_${book.id}")
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Mais opções",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = gridMenuExpanded,
+                            onDismissRequest = { gridMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Ver Código ISBN") },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.QrCode,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {
+                                    gridMenuExpanded = false
+                                    onViewIsbn?.invoke(book)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Mover para outra Lista") },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.SwapHoriz,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary
+                                    )
+                                },
+                                onClick = {
+                                    gridMenuExpanded = false
+                                    onMoveToList?.invoke(book)
+                                }
+                            )
+                            if (onEditBook != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Editar Informações") },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    onClick = {
+                                        gridMenuExpanded = false
+                                        onEditBook.invoke(book)
+                                    }
+                                )
+                            }
+                            if (onDeleteBook != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Remover Permanentemente", color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        gridMenuExpanded = false
+                                        onDeleteBook.invoke(book)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Text(
                     text = book.author,

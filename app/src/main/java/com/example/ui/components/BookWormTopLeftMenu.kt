@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,6 +45,23 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.ui.theme.WarmAmber
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Tab
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
+import com.example.util.AppLanguage
+import com.example.util.LanguageManager
+
 @Composable
 fun BookWormTopLeftMenu(
     currentRoute: String,
@@ -55,9 +73,17 @@ fun BookWormTopLeftMenu(
     onNavigateToStats: () -> Unit,
     onNavigateToAddBook: () -> Unit,
     onExportPdf: () -> Unit,
+    onCreateNewTab: (() -> Unit)? = null,
+    onShowPrivacyPolicy: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val currentLanguage by LanguageManager.currentLanguage.collectAsState()
+    val strings = remember(currentLanguage) { LanguageManager.getStrings(currentLanguage) }
+
     var expanded by remember { mutableStateOf(false) }
+    var showInternalPrivacyDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
         IconButton(
@@ -102,7 +128,7 @@ fun BookWormTopLeftMenu(
                     )
                 }
                 Text(
-                    text = "Opções do Aplicativo",
+                    text = strings.menuSubtitle,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -113,8 +139,8 @@ fun BookWormTopLeftMenu(
             // 1. Menu Inicial
             BookWormMenuItem(
                 icon = Icons.Default.Home,
-                title = "Menu Inicial",
-                subtitle = "Livro a ler e destaques",
+                title = strings.home,
+                subtitle = strings.homeSubtitle,
                 isSelected = currentRoute == "home",
                 testTag = "menu_item_home",
                 onClick = {
@@ -126,8 +152,8 @@ fun BookWormTopLeftMenu(
             // 2. A Minha Biblioteca
             BookWormMenuItem(
                 icon = Icons.Default.LocalLibrary,
-                title = "A Minha Biblioteca",
-                subtitle = "Todos os meus livros e filtros",
+                title = strings.myLibrary,
+                subtitle = strings.myLibrarySubtitle,
                 isSelected = currentRoute == "catalog",
                 testTag = "menu_item_library",
                 onClick = {
@@ -139,8 +165,8 @@ fun BookWormTopLeftMenu(
             // 3. Leitor de Código de Barras
             BookWormMenuItem(
                 icon = Icons.Default.QrCodeScanner,
-                title = "Leitor de Código de Barras",
-                subtitle = "Escanear ISBN com câmera",
+                title = strings.barcodeScanner,
+                subtitle = strings.barcodeScannerSubtitle,
                 isSelected = currentRoute == "scanner",
                 testTag = "menu_item_scan",
                 onClick = {
@@ -152,8 +178,8 @@ fun BookWormTopLeftMenu(
             // 4. Buscar em Bibliotecas Públicas
             BookWormMenuItem(
                 icon = Icons.Default.Search,
-                title = "Bibliotecas Públicas",
-                subtitle = "Open Library & Google Books",
+                title = strings.publicLibraries,
+                subtitle = strings.publicLibrariesSubtitle,
                 isSelected = currentRoute == "public_search",
                 testTag = "menu_item_search",
                 onClick = {
@@ -165,8 +191,8 @@ fun BookWormTopLeftMenu(
             // 5. Coleções & Tags
             BookWormMenuItem(
                 icon = Icons.Default.Bookmarks,
-                title = "Coleções & Tags",
-                subtitle = "Organizar suas estantes",
+                title = strings.collectionsTags,
+                subtitle = strings.collectionsTagsSubtitle,
                 isSelected = currentRoute == "collections",
                 testTag = "menu_item_collections",
                 onClick = {
@@ -178,8 +204,8 @@ fun BookWormTopLeftMenu(
             // 6. Estatísticas & Relatórios
             BookWormMenuItem(
                 icon = Icons.Default.BarChart,
-                title = "Estatísticas & Relatórios",
-                subtitle = "Gráficos, metas e resumos",
+                title = strings.statsReports,
+                subtitle = strings.statsReportsSubtitle,
                 isSelected = currentRoute == "statistics",
                 testTag = "menu_item_stats",
                 onClick = {
@@ -193,8 +219,8 @@ fun BookWormTopLeftMenu(
             // 7. Adicionar Novo Livro
             BookWormMenuItem(
                 icon = Icons.Default.Add,
-                title = "Adicionar Livro",
-                subtitle = "Novo cadastro no catálogo",
+                title = strings.addBook,
+                subtitle = strings.addBookSubtitle,
                 isSelected = false,
                 testTag = "menu_item_add_book",
                 onClick = {
@@ -203,11 +229,26 @@ fun BookWormTopLeftMenu(
                 }
             )
 
+            // Criar Nova Aba (Lista Permanente ou Temporária)
+            if (onCreateNewTab != null) {
+                BookWormMenuItem(
+                    icon = Icons.Default.Tab,
+                    title = strings.createNewTab,
+                    subtitle = strings.createNewTabSubtitle,
+                    isSelected = false,
+                    testTag = "menu_item_create_new_tab",
+                    onClick = {
+                        expanded = false
+                        onCreateNewTab()
+                    }
+                )
+            }
+
             // 8. Exportar em PDF
             BookWormMenuItem(
                 icon = Icons.Default.PictureAsPdf,
-                title = "Exportar Biblioteca (PDF)",
-                subtitle = "Gerar documento ou compartilhar",
+                title = strings.exportPdf,
+                subtitle = strings.exportPdfSubtitle,
                 isSelected = false,
                 testTag = "menu_item_export_pdf",
                 onClick = {
@@ -215,7 +256,192 @@ fun BookWormTopLeftMenu(
                     onExportPdf()
                 }
             )
+
+            Divider()
+
+            // 9. Política de Privacidade & Armazenamento Local
+            BookWormMenuItem(
+                icon = Icons.Default.Security,
+                title = strings.privacyPolicy,
+                subtitle = strings.privacyPolicySubtitle,
+                isSelected = false,
+                testTag = "menu_item_privacy_policy",
+                onClick = {
+                    expanded = false
+                    if (onShowPrivacyPolicy != null) {
+                        onShowPrivacyPolicy()
+                    } else {
+                        showInternalPrivacyDialog = true
+                    }
+                }
+            )
+
+            // 10. Mudar Idioma (Português-PT ↔ English-UK)
+            BookWormMenuItem(
+                icon = Icons.Default.Language,
+                title = strings.changeLanguage,
+                subtitle = strings.changeLanguageSubtitle,
+                isSelected = false,
+                testTag = "menu_item_change_language",
+                onClick = {
+                    expanded = false
+                    showLanguageDialog = true
+                }
+            )
         }
+    }
+
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Language,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = strings.selectLanguage,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AppLanguage.values().forEach { lang ->
+                        val isSelected = currentLanguage == lang
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    LanguageManager.setLanguage(context, lang)
+                                    showLanguageDialog = false
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = {
+                                        LanguageManager.setLanguage(context, lang)
+                                        showLanguageDialog = false
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = lang.flag,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = lang.displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                    Text(
+                                        text = if (lang == AppLanguage.PT) "Menus e navegação em Português de Portugal" else "Menus and navigation in UK English",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(strings.close)
+                }
+            }
+        )
+    }
+
+    if (showInternalPrivacyDialog) {
+        AlertDialog(
+            onDismissRequest = { showInternalPrivacyDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = strings.privacyTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = strings.privacyStorageLocal,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = strings.privacyStorageLocalDesc,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Divider()
+                    Text(
+                        text = strings.privacyGoogleNotice,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Button(
+                        onClick = {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://policies.google.com/privacy")
+                            )
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_google_privacy_policy_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(strings.privacyGoogleButton)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showInternalPrivacyDialog = false },
+                    modifier = Modifier.testTag("close_privacy_dialog_button")
+                ) {
+                    Text(strings.close)
+                }
+            }
+        )
     }
 }
 

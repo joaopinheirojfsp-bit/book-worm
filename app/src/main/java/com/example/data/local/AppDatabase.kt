@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.Book
 import com.example.data.model.BookCollection
@@ -20,7 +21,7 @@ import kotlinx.coroutines.launch
         BookCollection::class,
         BookCollectionCrossRef::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -31,6 +32,13 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN isTemporary INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE collections ADD COLUMN isTemporary INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -38,6 +46,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "biblio_catalog.db"
                 )
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -186,6 +195,7 @@ abstract class AppDatabase : RoomDatabase() {
                     isFavorite = false,
                     genre = "Realismo Mágico",
                     tags = "América Latina, Épico, Nobel",
+                    isTemporary = true,
                     dateAdded = now
                 )
             )

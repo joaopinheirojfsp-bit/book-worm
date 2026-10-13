@@ -29,7 +29,8 @@ data class Book(
     val dateAdded: Long = System.currentTimeMillis(),
     val dateFinished: Long? = null,
     val genre: String = "",
-    val tags: String = "" // comma-separated custom tags (e.g. "Ficção, Favorito, Emprestado")
+    val tags: String = "", // comma-separated custom tags (e.g. "Ficção, Favorito, Emprestado")
+    val isTemporary: Boolean = false
 ) {
     fun getTagsList(): List<String> {
         return if (tags.isBlank()) emptyList()

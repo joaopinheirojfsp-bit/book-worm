@@ -49,4 +49,31 @@ class ExampleRobolectricTest {
         assertEquals(5, book.rating)
         assertEquals("Excelente distopia", book.personalReview)
     }
+
+    @Test
+    fun `book temporary and permanent list rules`() {
+        val queroLerBook = Book(
+            title = "Cem Anos de Solidão",
+            author = "Gabriel García Márquez",
+            readingStatus = ReadingStatus.QUERO_LER,
+            isTemporary = true
+        )
+        assertTrue(queroLerBook.isTemporary)
+
+        val readBook = Book(
+            title = "Dom Casmurro",
+            author = "Machado de Assis",
+            readingStatus = ReadingStatus.LIDO,
+            isTemporary = false
+        )
+        assertTrue(!readBook.isTemporary)
+
+        // When moved from temporary to permanent, isTemporary becomes false
+        val movedBook = queroLerBook.copy(
+            readingStatus = ReadingStatus.LENDO,
+            isTemporary = false
+        )
+        assertTrue(!movedBook.isTemporary)
+        assertEquals(ReadingStatus.LENDO, movedBook.readingStatus)
+    }
 }

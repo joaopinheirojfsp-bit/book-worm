@@ -36,6 +36,14 @@ sealed interface LookupUiState {
     data class Error(val message: String) : LookupUiState
 }
 
+sealed interface TargetListOption {
+    object MinhaBiblioteca : TargetListOption
+    object ALer : TargetListOption
+    object Lidos : TargetListOption
+    object QueroLer : TargetListOption
+    data class Custom(val collection: BookCollection) : TargetListOption
+}
+
 data class FilterCriteria(
     val query: String = "",
     val status: ReadingStatus? = null,
@@ -68,8 +76,16 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: BookRepository
 
     init {
+        com.example.util.LanguageManager.init(application)
         val db = AppDatabase.getDatabase(application)
         repository = BookRepository(db.bookDao())
+    }
+
+    val currentLanguage: StateFlow<com.example.util.AppLanguage> =
+        com.example.util.LanguageManager.currentLanguage
+
+    fun setLanguage(language: com.example.util.AppLanguage) {
+        com.example.util.LanguageManager.setLanguage(getApplication(), language)
     }
 
     val filterCriteria = MutableStateFlow(FilterCriteria())
@@ -82,6 +98,13 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     val allBooksRaw: StateFlow<List<Book>> = repository.allBooks
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val allCrossRefsRaw: StateFlow<List<com.example.data.model.BookCollectionCrossRef>> = repository.allCrossRefs
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -245,6 +268,11 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateReadingStatus(book: Book, status: ReadingStatus) {
+        if (book.isTemporary) {
+            // Em abas e listas temporárias, a opção é estritamente não lido.
+            // Essa opção só é alterável quando se muda para lista permanente.
+            return
+        }
         viewModelScope.launch {
             val finishedDate = if (status == ReadingStatus.LIDO && book.dateFinished == null) {
                 System.currentTimeMillis()
@@ -279,6 +307,83 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 filterCriteria.value = filterCriteria.value.copy(selectedCollectionId = null)
             }
             repository.deleteCollection(collection)
+        }
+    }
+
+    fun moveBookToList(book: Book, target: TargetListOption, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            when (target) {
+                is TargetListOption.MinhaBiblioteca -> {
+                    val updated = book.copy(
+                        isTemporary = false,
+                        readingStatus = if (book.readingStatus == ReadingStatus.QUERO_LER) ReadingStatus.LENDO else book.readingStatus
+                    )
+                    repository.updateBook(updated)
+                }
+                is TargetListOption.ALer -> {
+                    val updated = book.copy(
+                        readingStatus = ReadingStatus.LENDO,
+                        isTemporary = false
+                    )
+                    repository.updateBook(updated)
+                }
+                is TargetListOption.Lidos -> {
+                    val finished = book.dateFinished ?: System.currentTimeMillis()
+                    val updated = book.copy(
+                        readingStatus = ReadingStatus.LIDO,
+                        isTemporary = false,
+                        dateFinished = finished
+                    )
+                    repository.updateBook(updated)
+                }
+                is TargetListOption.QueroLer -> {
+                    val updated = book.copy(
+                        readingStatus = ReadingStatus.QUERO_LER,
+                        isTemporary = true
+                    )
+                    repository.updateBook(updated)
+                }
+                is TargetListOption.Custom -> {
+                    val col = target.collection
+                    val updated = book.copy(
+                        isTemporary = col.isTemporary,
+                        readingStatus = if (col.isTemporary) ReadingStatus.QUERO_LER else (if (book.readingStatus == ReadingStatus.QUERO_LER) ReadingStatus.LENDO else book.readingStatus)
+                    )
+                    repository.updateBook(updated)
+                    repository.addBookToCollection(book.id, col.id)
+                }
+            }
+            onComplete()
+        }
+    }
+
+    fun createCustomTab(name: String, isTemporary: Boolean, colorHex: String = "#1E3A5F", description: String = "") {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            repository.insertCollection(
+                BookCollection(
+                    name = name.trim(),
+                    description = description.trim(),
+                    colorHex = colorHex,
+                    isTemporary = isTemporary
+                )
+            )
+        }
+    }
+
+    fun updateCustomTab(collection: BookCollection) {
+        viewModelScope.launch {
+            repository.updateCollection(collection)
+        }
+    }
+
+    fun deleteCustomTab(collection: BookCollection) {
+        deleteCollection(collection)
+    }
+
+    fun updateBookIsbn(book: Book, newIsbn: String) {
+        viewModelScope.launch {
+            repository.updateBook(book.copy(isbn = newIsbn.trim()))
         }
     }
 

@@ -10,6 +10,7 @@ data class BookCollection(
     val name: String,
     val description: String = "",
     val colorHex: String = "#1E3A5F",
+    val isTemporary: Boolean = false, // false = Lista Permanente, true = Lista Temporária
     val createdAt: Long = System.currentTimeMillis()
 )
 
